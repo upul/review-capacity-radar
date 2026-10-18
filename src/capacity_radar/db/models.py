@@ -38,9 +38,7 @@ class Repository(Base):
     __tablename__ = "repository"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    owner: Mapped[str] = mapped_column(
-        Text
-    )  # stored lowercase; GitHub names are case-insensitive
+    owner: Mapped[str] = mapped_column(Text)  # stored lowercase; GitHub names are case-insensitive
     name: Mapped[str] = mapped_column(Text)
 
     __table_args__ = (UniqueConstraint("owner", "name"),)
@@ -50,13 +48,9 @@ class PullRequest(Base):
     __tablename__ = "pull_request"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    repo_id: Mapped[int] = mapped_column(
-        ForeignKey("repository.id", ondelete="CASCADE")
-    )
+    repo_id: Mapped[int] = mapped_column(ForeignKey("repository.id", ondelete="CASCADE"))
     number: Mapped[int]
-    author_login: Mapped[str] = mapped_column(
-        Text
-    )  # "ghost" when the account was deleted
+    author_login: Mapped[str] = mapped_column(Text)  # "ghost" when the account was deleted
     author_is_bot: Mapped[bool]  # kept, not dropped, so bot share can be reported
     is_draft: Mapped[bool]
     created_at: Mapped[datetime]
@@ -74,9 +68,7 @@ class Review(Base):
     __tablename__ = "review"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    pr_id: Mapped[int] = mapped_column(
-        ForeignKey("pull_request.id", ondelete="CASCADE")
-    )
+    pr_id: Mapped[int] = mapped_column(ForeignKey("pull_request.id", ondelete="CASCADE"))
     reviewer_login: Mapped[str] = mapped_column(Text)
     reviewer_is_bot: Mapped[bool]
     # APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED or PENDING.
@@ -93,9 +85,7 @@ class SyncState(Base):
         ForeignKey("repository.id", ondelete="CASCADE"), primary_key=True
     )
     cursor_updated_at: Mapped[datetime | None]  # newest PR updated_at seen
-    list_etag: Mapped[str | None] = mapped_column(
-        Text
-    )  # ETag of the first PR-list page
+    list_etag: Mapped[str | None] = mapped_column(Text)  # ETag of the first PR-list page
     last_success_at: Mapped[datetime | None]
 
 
@@ -114,9 +104,7 @@ class SyncRun(Base):
 
     __table_args__ = (
         CheckConstraint(f"status IN {SYNC_STATUSES}", name="status"),
-        Index(
-            None, "status", "requested_at"
-        ),  # the background task claims oldest queued
+        Index(None, "status", "requested_at"),  # the background task claims oldest queued
     )
 
 
@@ -124,9 +112,7 @@ class NarrativeCache(Base):
     __tablename__ = "narrative_cache"
 
     cache_key: Mapped[str] = mapped_column(Text, primary_key=True)
-    repo_id: Mapped[int] = mapped_column(
-        ForeignKey("repository.id", ondelete="CASCADE")
-    )
+    repo_id: Mapped[int] = mapped_column(ForeignKey("repository.id", ondelete="CASCADE"))
     prompt_version: Mapped[str] = mapped_column(Text)
     model: Mapped[str] = mapped_column(Text)
     response: Mapped[dict[str, Any]]

@@ -47,9 +47,7 @@ class Settings(BaseSettings):
 
     #  API limits
     max_window_days: Annotated[int, Field(ge=7, le=366)] = 182  # longest date range
-    max_forecast_weeks: Annotated[int, Field(ge=1, le=26)] = (
-        12  # longest forecast horizon
-    )
+    max_forecast_weeks: Annotated[int, Field(ge=1, le=26)] = 12  # longest forecast horizon
 
     @field_validator("database_url")
     @classmethod
