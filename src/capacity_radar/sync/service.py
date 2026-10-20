@@ -105,7 +105,7 @@ async def sync_repo(
     if cursor is not None and new_cursor is not None:
         new_cursor = max(new_cursor, cursor)
     async with session_factory() as session, session.begin():
-        await _save_sync_state(session, info.id, new_cursor)
+        await _save_sync_state(session, info.id, new_cursor, stop_at if first_run else None)
 
     return SyncResult(
         repo=slug,
@@ -174,12 +174,19 @@ async def _upsert_reviews(session: AsyncSession, pr_id: int, reviews: list[Revie
     )
 
 
-async def _save_sync_state(session: AsyncSession, repo_id: int, cursor: datetime | None) -> None:
+async def _save_sync_state(
+    session: AsyncSession,
+    repo_id: int,
+    cursor: datetime | None,
+    history_start: datetime | None,
+) -> None:
+    """Record the new cursor. `history_start` is only passed on the first run: it marks
+    where the synced data begins, so analytics can refuse windows the data doesn't cover."""
     now = datetime.now(UTC)
-    stmt = insert(SyncState).values(repo_id=repo_id, cursor_updated_at=cursor, last_success_at=now)
+    values = {"cursor_updated_at": cursor, "last_success_at": now}
+    if history_start is not None:
+        values["history_start"] = history_start
+    stmt = insert(SyncState).values(repo_id=repo_id, **values)
     await session.execute(
-        stmt.on_conflict_do_update(
-            index_elements=[SyncState.repo_id],
-            set_={"cursor_updated_at": cursor, "last_success_at": now},
-        )
+        stmt.on_conflict_do_update(index_elements=[SyncState.repo_id], set_=values)
     )

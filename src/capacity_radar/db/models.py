@@ -85,6 +85,7 @@ class SyncState(Base):
         ForeignKey("repository.id", ondelete="CASCADE"), primary_key=True
     )
     cursor_updated_at: Mapped[datetime | None]  # newest PR updated_at seen
+    history_start: Mapped[datetime | None]  # data is complete from here on (set on first run)
     list_etag: Mapped[str | None] = mapped_column(Text)  # ETag of the first PR-list page
     last_success_at: Mapped[datetime | None]
 
