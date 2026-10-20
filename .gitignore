@@ -223,3 +223,6 @@ __marimo__/
 
 # MacOS specific
 .DS_Store
+
+#
+scratch/

@@ -1,0 +1,82 @@
+[
+  {
+    "id": 5165513500,
+    "node_id": "PRR_kwDOAAzd1s8AAAABM-N7HA",
+    "user": {
+      "login": "AnneBeyer",
+      "id": 12881170,
+      "node_id": "MDQ6VXNlcjEyODgxMTcw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/12881170?u=2284b69ce3f895c41e9940ff00a205afc2708eb7&v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/AnneBeyer",
+      "html_url": "https://github.com/AnneBeyer",
+      "followers_url": "https://api.github.com/users/AnneBeyer/followers",
+      "following_url": "https://api.github.com/users/AnneBeyer/following{/other_user}",
+      "gists_url": "https://api.github.com/users/AnneBeyer/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/AnneBeyer/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/AnneBeyer/subscriptions",
+      "organizations_url": "https://api.github.com/users/AnneBeyer/orgs",
+      "repos_url": "https://api.github.com/users/AnneBeyer/repos",
+      "events_url": "https://api.github.com/users/AnneBeyer/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/AnneBeyer/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/scikit-learn/scikit-learn/pull/34918#pullrequestreview-5165513500",
+    "pull_request_url": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34918",
+    "author_association": "CONTRIBUTOR",
+    "_links": {
+      "html": {
+        "href": "https://github.com/scikit-learn/scikit-learn/pull/34918#pullrequestreview-5165513500"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34918"
+      }
+    },
+    "submitted_at": "2026-09-10T09:49:02Z",
+    "commit_id": "93b352d62448a72f70aa5a2bdbee89a2d34c6be0"
+  },
+  {
+    "id": 5167617701,
+    "node_id": "PRR_kwDOAAzd1s8AAAABNAOWpQ",
+    "user": {
+      "login": "ogrisel",
+      "id": 89061,
+      "node_id": "MDQ6VXNlcjg5MDYx",
+      "avatar_url": "https://avatars.githubusercontent.com/u/89061?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/ogrisel",
+      "html_url": "https://github.com/ogrisel",
+      "followers_url": "https://api.github.com/users/ogrisel/followers",
+      "following_url": "https://api.github.com/users/ogrisel/following{/other_user}",
+      "gists_url": "https://api.github.com/users/ogrisel/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/ogrisel/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/ogrisel/subscriptions",
+      "organizations_url": "https://api.github.com/users/ogrisel/orgs",
+      "repos_url": "https://api.github.com/users/ogrisel/repos",
+      "events_url": "https://api.github.com/users/ogrisel/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/ogrisel/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "",
+    "state": "APPROVED",
+    "html_url": "https://github.com/scikit-learn/scikit-learn/pull/34918#pullrequestreview-5167617701",
+    "pull_request_url": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34918",
+    "author_association": "MEMBER",
+    "_links": {
+      "html": {
+        "href": "https://github.com/scikit-learn/scikit-learn/pull/34918#pullrequestreview-5167617701"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34918"
+      }
+    },
+    "submitted_at": "2026-09-10T13:22:29Z",
+    "commit_id": "93b352d62448a72f70aa5a2bdbee89a2d34c6be0"
+  }
+]

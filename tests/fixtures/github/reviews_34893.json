@@ -1,0 +1,82 @@
+[
+  {
+    "id": 5126202104,
+    "node_id": "PRR_kwDOAAzd1s8AAAABMYui-A",
+    "user": {
+      "login": "copilot-pull-request-reviewer[bot]",
+      "id": 175728472,
+      "node_id": "BOT_kgDOCnlnWA",
+      "avatar_url": "https://avatars.githubusercontent.com/in/946600?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D",
+      "html_url": "https://github.com/apps/copilot-pull-request-reviewer",
+      "followers_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/copilot-pull-request-reviewer%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### 🟡 Changes recommended\n\nThe new docstrings use an undefined “dual_coef” symbol and a coefficient recovery expression whose shape/orientation is misleading for multi-target outputs, so the formulas should be clarified before merge.\n\n*Once you've addressed the issues Copilot identified, you can request another Copilot review.*\n\n<details>\n<summary>Pull request overview</summary>\n\nThis PR updates scikit-learn’s Ridge documentation to explicitly describe that the `cholesky` and `sparse_cg` solvers switch between primal and dual formulations depending on whether `n_samples >= n_features` or not, aligning the public docs with the implementation in `sklearn/linear_model/_ridge.py`.\n\n**Changes:**\n- Expand the solver descriptions for `cholesky` and `sparse_cg` in `ridge_regression`, `Ridge`, and `RidgeClassifier` to mention the primal/dual switch and its implications.\n- Add a short explanatory paragraph to the Ridge section of the user guide (`linear_model.rst`) immediately after the `solver=\"auto\"` selection table.\n\nThis pull request includes code written with the assistance of AI.  \nThe code has **not yet been reviewed** by a human.\n</details>\n\n<details>\n<summary>File summaries</summary>\n\n| File | Description |\r\n| ---- | ----------- |\r\n| sklearn/linear_model/_ridge.py | Extends solver docstrings to explain primal vs dual behavior for `cholesky`/`sparse_cg`. |\r\n| doc/modules/linear_model.rst | Adds a user-guide paragraph clarifying the primal/dual switch and memory/conditioning implications. |\n</details>\n\n<details>\n<summary>Review details</summary>\n\n### Suppressed comments (2)\n\n**sklearn/linear_model/_ridge.py:1116**\n* In the Ridge 'cholesky' solver description, ``dual_coef`` is not a public attribute and the expression ``X' @ dual_coef`` has the transposed shape relative to ``coef_`` for multi-target problems. Use a generic symbol for the dual coefficients and make the transpose explicit (or otherwise clarify the orientation).\n```\n          kernel ``K = X X'``, solves the dual problem for the dual\n          coefficients, and recovers ``coef_`` as ``X' @ dual_coef``. Both\n```\n**sklearn/linear_model/_ridge.py:1490**\n* In the RidgeClassifier 'cholesky' solver description, ``dual_coef`` is not a public attribute and ``X' @ dual_coef`` has the transposed shape relative to ``coef_`` for multi-target problems. Use a generic symbol for the dual coefficients and make the transpose explicit (or otherwise clarify the orientation).\n```\n          kernel ``K = X X'``, solves the dual problem for the dual\n          coefficients, and recovers ``coef_`` as ``X' @ dual_coef``. Both\n```\n\n- **Files reviewed:** 2/2 changed files\n- **Comments generated:** 1\n- **Review effort level:** Lite\n</details>\n\n---\n\n💡 <a href=\"/scikit-learn/scikit-learn/new/main?filename=.github/skills/code-review/SKILL.md\" class=\"Link--inTextBlock\" target=\"_blank\" rel=\"noopener noreferrer\">Add a `code-review` agent skill</a> or configure MCP servers for context-aware, tailored reviews. <a href=\"https://docs.github.com/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review?tool=webui#mcp-servers-and-agent-skills\" class=\"Link--inTextBlock\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more in the docs.</a>",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/scikit-learn/scikit-learn/pull/34893#pullrequestreview-5126202104",
+    "pull_request_url": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34893",
+    "author_association": "CONTRIBUTOR",
+    "_links": {
+      "html": {
+        "href": "https://github.com/scikit-learn/scikit-learn/pull/34893#pullrequestreview-5126202104"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34893"
+      }
+    },
+    "submitted_at": "2026-09-06T18:17:02Z",
+    "commit_id": "5151c95714cc243763012331c94c319ef33e1b60"
+  },
+  {
+    "id": 5126275657,
+    "node_id": "PRR_kwDOAAzd1s8AAAABMYzCSQ",
+    "user": {
+      "login": "itz-puneet",
+      "id": 117641393,
+      "node_id": "U_kgDOBwMQsQ",
+      "avatar_url": "https://avatars.githubusercontent.com/u/117641393?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/itz-puneet",
+      "html_url": "https://github.com/itz-puneet",
+      "followers_url": "https://api.github.com/users/itz-puneet/followers",
+      "following_url": "https://api.github.com/users/itz-puneet/following{/other_user}",
+      "gists_url": "https://api.github.com/users/itz-puneet/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/itz-puneet/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/itz-puneet/subscriptions",
+      "organizations_url": "https://api.github.com/users/itz-puneet/orgs",
+      "repos_url": "https://api.github.com/users/itz-puneet/repos",
+      "events_url": "https://api.github.com/users/itz-puneet/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/itz-puneet/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/scikit-learn/scikit-learn/pull/34893#pullrequestreview-5126275657",
+    "pull_request_url": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34893",
+    "author_association": "NONE",
+    "_links": {
+      "html": {
+        "href": "https://github.com/scikit-learn/scikit-learn/pull/34893#pullrequestreview-5126275657"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/scikit-learn/scikit-learn/pulls/34893"
+      }
+    },
+    "submitted_at": "2026-09-06T18:48:40Z",
+    "commit_id": "20f8bfb0343541249941b85a0969fffb5a69d7f3"
+  }
+]

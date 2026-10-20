@@ -54,7 +54,7 @@ async def load_pr_facts(session: AsyncSession, repo_id: int, window: Window) -> 
             or_(PullRequest.closed_at.is_(None), PullRequest.closed_at >= window.start),
         )
     )
-    return [PrFacts(*row) for row in rows.tuples()]
+    return [PrFacts(*row) for row in rows]
 
 
 async def load_review_pairs(
@@ -72,7 +72,7 @@ async def load_review_pairs(
             Review.submitted_at < window.end,
         )
     )
-    return list(rows.tuples())
+    return [(reviewer, number) for reviewer, number in rows]
 
 
 async def load_data_quality(session: AsyncSession, repo_id: int, window: Window) -> DataQuality:

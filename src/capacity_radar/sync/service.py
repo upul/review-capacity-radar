@@ -78,7 +78,7 @@ async def sync_repo(
                 PullRequestRow.id.in_(changed.keys())
             )
         )
-        stored = dict(rows.tuples().all())
+        stored = dict(rows.all())
     to_sync = [pr for pr in changed.values() if stored.get(pr.id) != pr.updated_at]
 
     logger.info(
