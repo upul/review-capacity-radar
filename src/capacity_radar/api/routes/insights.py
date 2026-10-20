@@ -75,6 +75,14 @@ async def review_capacity(
         ),
         data_as_of=data_as_of,
         summary=_summary(report),
+        flow_balance=schemas.FlowBalanceOut(
+            queue_at_start=report.flow_balance.queue_at_start,
+            arrivals=report.flow_balance.arrivals,
+            served=report.flow_balance.served,
+            exited_unreviewed=report.flow_balance.exited_unreviewed,
+            queue_at_end=report.flow_balance.queue_at_end,
+            balanced=report.flow_balance.balanced,
+        ),
         littles_law=schemas.LittlesLawOut(
             arrival_rate_per_day=_round(report.littles_law.arrival_rate_per_day, 2),
             mean_days_in_queue=_round(report.littles_law.mean_days_in_queue, 1),
@@ -123,6 +131,8 @@ def _summary(report: CapacityReport) -> schemas.Summary:
         queue=schemas.Queue(
             at_start=report.queue_at_start,
             at_end=report.queue_at_end,
+            at_end_fresh=report.queue_at_end - report.queue_at_end_stale,
+            at_end_stale=report.queue_at_end_stale,
             still_waiting_median_age_hours=_round(report.still_waiting_median_age_hours, 1),
         ),
     )

@@ -50,10 +50,14 @@ def make_window(
 ) -> Window:
     """Validate a requested date range against the synced data.
 
-    Defaults: the last day with data, and the 12 weeks ending on it.
+    Defaults: the last complete day of data, and the 12 weeks ending on it (shortened if
+    the synced history doesn't reach back that far).
     """
-    last_day = last_day or data_as_of.date()
-    first_day = first_day or last_day - timedelta(weeks=DEFAULT_WEEKS) + timedelta(days=1)
+    first_full_day = _first_full_day(history_start)
+    last_day = last_day or (data_as_of - timedelta(days=1)).date()  # last complete day
+    if first_day is None:
+        twelve_weeks_back = last_day - timedelta(weeks=DEFAULT_WEEKS) + timedelta(days=1)
+        first_day = max(twelve_weeks_back, first_full_day)
 
     if first_day > last_day:
         raise WindowError("'from' must be on or before 'to'")
@@ -61,12 +65,17 @@ def make_window(
         raise WindowError(f"the window can be at most {max_days} days")
 
     window = Window(_midnight(first_day), _midnight(last_day + timedelta(days=1)))
-    if window.start < history_start:
-        first_full_day = history_start.date() + timedelta(days=history_start.time() != time.min)
+    if first_day < first_full_day:
         raise WindowError(f"synced data covers {first_full_day} onwards; move 'from' later")
     if first_day > data_as_of.date():
         raise WindowError(f"no data after {data_as_of.date()}; the last sync was then")
     return window
+
+
+def _first_full_day(history_start: datetime) -> date:
+    """The first day the synced data covers completely."""
+    starts_at_midnight = history_start.time() == time.min
+    return history_start.date() + timedelta(days=0 if starts_at_midnight else 1)
 
 
 def _midnight(day: date) -> datetime:

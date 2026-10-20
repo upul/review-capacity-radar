@@ -18,6 +18,7 @@ from capacity_radar.analytics.periods import Window
 
 HOUR = timedelta(hours=1)
 DAY = timedelta(days=1)
+STALE_AFTER = timedelta(days=30)  # waiting longer than this counts as stale backlog
 
 
 @dataclass(frozen=True)
@@ -44,8 +45,11 @@ class PrFacts:
         return self.closed_at  # None while still waiting
 
     def in_queue_at(self, moment: datetime) -> bool:
+        """Waiting at `moment`: arrived before it, and not yet left. Events exactly at
+        `moment` belong to the period that starts there, which keeps the flow balance exact
+        (a PR created at the window's start is an arrival, not part of the starting queue)."""
         left = self.left_queue_at
-        return self.created_at <= moment and (left is None or left > moment)
+        return self.created_at < moment and (left is None or left >= moment)
 
 
 @dataclass(frozen=True)
@@ -71,6 +75,25 @@ class LittlesLaw:
 
 
 @dataclass(frozen=True)
+class FlowBalance:
+    """queue at start + arrivals - served - exited unreviewed = queue at end, always.
+    Each term is computed separately, so a mismatch can only mean a bug."""
+
+    queue_at_start: int
+    arrivals: int
+    served: int
+    exited_unreviewed: int
+    queue_at_end: int
+
+    @property
+    def balanced(self) -> bool:
+        return (
+            self.queue_at_start + self.arrivals - self.served - self.exited_unreviewed
+            == self.queue_at_end
+        )
+
+
+@dataclass(frozen=True)
 class CapacityReport:
     arrivals: int
     served: int
@@ -81,8 +104,10 @@ class CapacityReport:
     wait_sample_size: int
     queue_at_start: int
     queue_at_end: int
+    queue_at_end_stale: int  # of those, waiting longer than STALE_AFTER
     still_waiting_median_age_hours: float | None
     littles_law: LittlesLaw
+    flow_balance: FlowBalance
     weeks: list[WeekMetrics] = field(default_factory=list)
 
 
@@ -125,6 +150,7 @@ def capacity_report(prs: list[PrFacts], window: Window) -> CapacityReport:
     waits = [_wait_hours(pr) for pr in served]
     still_waiting = [pr for pr in prs if pr.in_queue_at(window.end)]
     arrivals = sum(between(pr.created_at, window.start, window.end) for pr in prs)
+    queue_at_start = sum(pr.in_queue_at(window.start) for pr in prs)
 
     return CapacityReport(
         arrivals=arrivals,
@@ -134,12 +160,20 @@ def capacity_report(prs: list[PrFacts], window: Window) -> CapacityReport:
         wait_hours_median=_median(waits),
         wait_hours_p90=_percentile(waits, 90),
         wait_sample_size=len(waits),
-        queue_at_start=sum(pr.in_queue_at(window.start) for pr in prs),
+        queue_at_start=queue_at_start,
         queue_at_end=len(still_waiting),
+        queue_at_end_stale=sum(window.end - pr.created_at > STALE_AFTER for pr in still_waiting),
         still_waiting_median_age_hours=_median(
             [(window.end - pr.created_at) / HOUR for pr in still_waiting]
         ),
         littles_law=_littles_law(prs, window, arrivals),
+        flow_balance=FlowBalance(
+            queue_at_start=queue_at_start,
+            arrivals=arrivals,
+            served=len(served),
+            exited_unreviewed=len(unreviewed_exits),
+            queue_at_end=len(still_waiting),
+        ),
         weeks=weeks,
     )
 

@@ -11,7 +11,8 @@ Window: Mon 5 Jan - Sun 18 Jan 2026 (14 days, two full weeks). Six eligible PRs:
   6   10 Jan 00:00   12 Jan 00:00    closed 11 Jan     closed BEFORE its review: exited unreviewed
 """
 
-from datetime import UTC, datetime
+import random
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -109,3 +110,56 @@ def test_empty_inputs_do_not_crash():
     assert report.arrivals == 0 and report.wait_hours_median is None
     assert report.littles_law.predicted_queue is None
     assert reviewer_concentration([])["top1_share"] is None
+
+
+def test_flow_balance_on_the_example(report):
+    flow = report.flow_balance
+    # 1 waiting + 5 arrived - 2 served - 3 exited unreviewed = 1 still waiting
+    assert (flow.queue_at_start, flow.arrivals, flow.served, flow.exited_unreviewed) == (1, 5, 2, 3)
+    assert flow.queue_at_end == 1 and flow.balanced
+
+
+def test_events_exactly_on_the_window_boundaries_keep_the_balance():
+    prs = [
+        # created at the very start: an arrival, not part of the starting queue
+        PrFacts(10, created_at=at(5), first_review_at=None, merged_at=None, closed_at=None),
+        # waiting before the start, reviewed at the very start: starting queue, then served
+        PrFacts(11, created_at=at(1), first_review_at=at(5), merged_at=None, closed_at=None),
+        # reviewed at the very end: still waiting when the window closes
+        PrFacts(12, created_at=at(6), first_review_at=at(19), merged_at=None, closed_at=None),
+    ]
+    flow = capacity_report(prs, WINDOW).flow_balance
+    assert (flow.queue_at_start, flow.arrivals, flow.served, flow.queue_at_end) == (1, 2, 1, 2)
+    assert flow.balanced
+
+
+def test_flow_balance_holds_for_random_histories():
+    # Every PR's path is counted exactly once, whatever the timestamps
+    rng = random.Random(42)
+    base = at(1)
+    for _ in range(200):
+        prs = []
+        for number in range(rng.randint(0, 40)):
+            created = base + timedelta(hours=rng.uniform(0, 30 * 24))
+            review = (
+                created + timedelta(hours=rng.expovariate(1 / 72)) if rng.random() < 0.7 else None
+            )
+            closed = (
+                created + timedelta(hours=rng.expovariate(1 / 96)) if rng.random() < 0.5 else None
+            )
+            merged = closed if closed and rng.random() < 0.6 else None
+            prs.append(PrFacts(number, created, review, merged, closed))
+        assert capacity_report(prs, WINDOW).flow_balance.balanced
+
+
+def test_stale_split_of_the_final_queue(report):
+    # PR 4 has waited 20 days by the window's end: still fresh (30-day threshold)
+    assert report.queue_at_end == 1 and report.queue_at_end_stale == 0
+    old = PrFacts(
+        20,
+        created_at=at(1, month=11, year=2025),
+        first_review_at=None,
+        merged_at=None,
+        closed_at=None,
+    )  # waiting about 79 days
+    assert capacity_report([*PRS, old], WINDOW).queue_at_end_stale == 1

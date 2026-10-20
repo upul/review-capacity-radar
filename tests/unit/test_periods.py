@@ -14,11 +14,18 @@ def window(first=None, last=None, max_days=182):
     )
 
 
-def test_default_is_the_last_twelve_weeks():
+def test_default_ends_at_the_last_complete_day():
+    # Data runs to 19 Oct 23:55, so 19 Oct is incomplete: the default window ends on 18 Oct
+    w = window()
+    assert w.end == datetime(2026, 10, 19, tzinfo=UTC)  # exclusive: the day after 18 Oct
+
+
+def test_default_start_is_clamped_to_the_synced_history():
+    # 12 weeks back from 18 Oct would be 27 Jul, but history only fully covers 28 Jul onwards
     w = window()
     assert w.start == datetime(2026, 7, 28, tzinfo=UTC)
-    assert w.end == datetime(2026, 10, 20, tzinfo=UTC)  # exclusive: the day after 19 Oct
-    assert len(w.buckets()) == 12 and not any(b.partial for b in w.buckets())
+    buckets = w.buckets()
+    assert len(buckets) == 12 and buckets[-1].partial  # 83 days: the last week has 6
 
 
 def test_explicit_window():

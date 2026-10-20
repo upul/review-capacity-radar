@@ -20,6 +20,8 @@ class WaitHours(BaseModel):
 class Queue(BaseModel):
     at_start: int
     at_end: int = Field(description="PRs still waiting for a first review when the window ends")
+    at_end_fresh: int = Field(description="...of which waiting 30 days or less")
+    at_end_stale: int = Field(description="...of which waiting more than 30 days: stale backlog")
     still_waiting_median_age_hours: float | None
 
 
@@ -44,6 +46,17 @@ class LittlesLawOut(BaseModel):
     gap_percent: float | None = Field(
         description="measured vs predicted; a large gap means the queue isn't steady"
     )
+
+
+class FlowBalanceOut(BaseModel):
+    """queue at start + arrivals - served - exited unreviewed = queue at end"""
+
+    queue_at_start: int
+    arrivals: int
+    served: int
+    exited_unreviewed: int
+    queue_at_end: int
+    balanced: bool = Field(description="always true; false would mean a bug in the metrics")
 
 
 class ReviewerShare(BaseModel):
@@ -88,6 +101,7 @@ class CapacityResponse(BaseModel):
     window: WindowOut
     data_as_of: datetime
     summary: Summary
+    flow_balance: FlowBalanceOut
     littles_law: LittlesLawOut
     reviewers: Reviewers
     weeks: list[Week]

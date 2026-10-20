@@ -41,7 +41,7 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "ASYNC", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # assert is how pytest tests are written
+"tests/**" = ["S101", "S311"]  # assert is how pytest tests are written
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
