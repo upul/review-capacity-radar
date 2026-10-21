@@ -1,6 +1,7 @@
 """Response models for the insights API. They define the JSON shape shown in /docs."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -144,3 +145,30 @@ class QueueForecastResponse(BaseModel):
     history: ForecastHistory
     simulation: Simulation
     forecast: list[ForecastWeekOut]
+
+
+class FactOut(BaseModel):
+    id: str
+    text: str
+
+
+class NarrativeOut(BaseModel):
+    summary: str = Field(description="what happened; each number is followed by its fact ID")
+    hypothesis: str = Field(description="the most likely cause")
+    confidence: float = Field(description="0-1: the LLM's, capped by how much data there is")
+    confidence_notes: list[str] = Field(description="why the confidence was lowered, if it was")
+
+
+class NarrativeResponse(BaseModel):
+    repo: str
+    window: WindowOut
+    data_as_of: datetime
+    narrative: NarrativeOut
+    evidence: list[FactOut] = Field(description="the facts the narrative cites, in order")
+    facts: list[FactOut] = Field(description="every fact the LLM was given")
+    source: Literal["llm", "cache", "fallback"] = Field(
+        description="fallback: the LLM's answer failed the checks twice, or the LLM was down"
+    )
+    model: str
+    prompt_version: str
+    problems: list[str] = Field(description="why the LLM's answers were rejected (fallback only)")

@@ -1,5 +1,6 @@
 """GET /api/v1/repos/{owner}/{repo}/insights/review-capacity
-GET /api/v1/repos/{owner}/{repo}/insights/queue-forecast"""
+GET /api/v1/repos/{owner}/{repo}/insights/queue-forecast
+GET /api/v1/repos/{owner}/{repo}/insights/narrative"""
 
 from datetime import date, datetime, timedelta
 from typing import Annotated
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from capacity_radar.analytics import queries
+from capacity_radar.analytics.anomalies import find_anomalies
 from capacity_radar.analytics.forecast import MIN_HISTORY_WEEKS, RUNS, SEED, forecast_queue
 from capacity_radar.analytics.metrics import (
     CapacityReport,
@@ -23,9 +25,13 @@ from capacity_radar.analytics.periods import (
     recent_full_weeks,
 )
 from capacity_radar.api import schemas
-from capacity_radar.api.deps import SessionDep, SettingsDep
+from capacity_radar.api.deps import LLMDep, SessionDep, SettingsDep
 from capacity_radar.api.errors import ProblemError
 from capacity_radar.db.models import Repository, SyncState
+from capacity_radar.narrative.evidence import Fact, build_facts
+from capacity_radar.narrative.llm import PROMPT_VERSION
+from capacity_radar.narrative.service import cache_key, cached, store, write_narrative
+from capacity_radar.settings import Settings
 
 router = APIRouter(prefix="/api/v1", tags=["insights"])
 
@@ -33,6 +39,8 @@ router = APIRouter(prefix="/api/v1", tags=["insights"])
 Name = Annotated[str, Path(pattern=r"^[A-Za-z0-9._-]{1,100}$")]
 
 PROBLEM = {"content": {"application/problem+json": {}}}
+
+NARRATIVE_WEEKS = 4  # how far ahead the narrative's forecast fact looks
 
 
 @router.get(
@@ -51,16 +59,7 @@ async def review_capacity(
     """Review supply and demand for a repository over a date range (UTC, both ends
     inclusive). Defaults to the 12 weeks ending at the last complete day of data."""
     repository, history_start, data_as_of = await _synced_repo(session, owner, repo)
-    try:
-        window = make_window(
-            first_day,
-            last_day,
-            history_start=history_start,
-            data_as_of=data_as_of,
-            max_days=settings.max_window_days,
-        )
-    except WindowError as exc:
-        raise ProblemError(400, str(exc)) from exc
+    window = _window(first_day, last_day, history_start, data_as_of, settings)
 
     facts = await queries.load_pr_facts(session, repository.id, window)
     pairs = await queries.load_review_pairs(session, repository.id, window)
@@ -133,15 +132,12 @@ async def queue_forecast(
         raise ProblemError(400, f"'weeks' can be at most {settings.max_forecast_weeks}")
     repository, history_start, data_as_of = await _synced_repo(session, owner, repo)
 
-    window = recent_full_weeks(
-        history_start=history_start, data_as_of=data_as_of, weeks=DEFAULT_WEEKS
-    )
-    history = capacity_report(await queries.load_pr_facts(session, repository.id, window), window)
+    window, history = await _recent_history(session, repository.id, history_start, data_as_of)
     if len(history.weeks) < MIN_HISTORY_WEEKS:
         raise ProblemError(
             400, f"need {MIN_HISTORY_WEEKS} complete weeks of synced data to forecast"
         )
-    net_changes = [week.arrivals - week.served - week.exited_unreviewed for week in history.weeks]
+    net_changes = _net_changes(history)
     forecast = forecast_queue(history.queue_at_end, net_changes, weeks)
 
     return schemas.QueueForecastResponse(
@@ -176,6 +172,108 @@ async def queue_forecast(
             for week in forecast
         ],
     )
+
+
+@router.get(
+    "/repos/{owner}/{repo}/insights/narrative",
+    response_model=schemas.NarrativeResponse,
+    responses={400: PROBLEM, 404: PROBLEM, 422: PROBLEM},
+)
+async def narrative(
+    owner: Name,
+    repo: Name,
+    session: SessionDep,
+    settings: SettingsDep,
+    llm: LLMDep,
+    first_day: Annotated[date | None, Query(alias="from")] = None,
+    last_day: Annotated[date | None, Query(alias="to")] = None,
+) -> schemas.NarrativeResponse:
+    """What happened to the review queue and the most likely cause, written by an LLM from
+    numbered facts. Every number in it is checked against the facts it cites; if the LLM's
+    answer fails those checks twice, a plain summary of the facts is returned instead."""
+    # 1. The facts, computed by code: the same numbers as review-capacity, plus anomalies.
+    repository, history_start, data_as_of = await _synced_repo(session, owner, repo)
+    window = _window(first_day, last_day, history_start, data_as_of, settings)
+    report = capacity_report(await queries.load_pr_facts(session, repository.id, window), window)
+    reviewers = reviewer_concentration(
+        await queries.load_review_pairs(session, repository.id, window)
+    )
+    quality = await queries.load_data_quality(session, repository.id, window)
+    forecast = []
+    history_window, history = await _recent_history(
+        session, repository.id, history_start, data_as_of
+    )
+    if window.end == history_window.end and len(history.weeks) >= MIN_HISTORY_WEEKS:
+        # Only a window ending today has a "today's queue" for the forecast to start from.
+        forecast = forecast_queue(history.queue_at_end, _net_changes(history), NARRATIVE_WEEKS)
+    facts = build_facts(window, report, reviewers, quality, find_anomalies(report.weeks), forecast)
+
+    # 2. The narrative: from the cache if these exact facts were explained before.
+    key = cache_key(repository.id, llm.model, facts)
+    result = await cached(session, key)
+    if result is None:
+        await session.close()  # give the connection back to the pool during the slow LLM call
+        result = await write_narrative(llm, facts, report, quality)
+        await store(session, key, repository.id, llm.model, result)
+
+    by_id = {fact.id: fact for fact in facts}
+    return schemas.NarrativeResponse(
+        repo=f"{repository.owner}/{repository.name}",
+        window=schemas.WindowOut(
+            start=window.start.date(), end=_last_day(window), days=int(window.days)
+        ),
+        data_as_of=data_as_of,
+        narrative=schemas.NarrativeOut(
+            summary=result.summary,
+            hypothesis=result.hypothesis,
+            confidence=result.confidence,
+            confidence_notes=result.confidence_notes,
+        ),
+        evidence=[_fact_out(by_id[fact_id]) for fact_id in result.evidence],
+        facts=[_fact_out(fact) for fact in facts],
+        source=result.source,
+        model=llm.model,
+        prompt_version=PROMPT_VERSION,
+        problems=result.problems,
+    )
+
+
+def _window(
+    first_day: date | None,
+    last_day: date | None,
+    history_start: datetime,
+    data_as_of: datetime,
+    settings: Settings,
+) -> Window:
+    """The requested window, checked against the synced data; 400 if it doesn't fit."""
+    try:
+        return make_window(
+            first_day,
+            last_day,
+            history_start=history_start,
+            data_as_of=data_as_of,
+            max_days=settings.max_window_days,
+        )
+    except WindowError as exc:
+        raise ProblemError(400, str(exc)) from exc
+
+
+async def _recent_history(
+    session: AsyncSession, repo_id: int, history_start: datetime, data_as_of: datetime
+) -> tuple[Window, CapacityReport]:
+    """The last 12 complete weeks, which the forecast replays."""
+    window = recent_full_weeks(
+        history_start=history_start, data_as_of=data_as_of, weeks=DEFAULT_WEEKS
+    )
+    return window, capacity_report(await queries.load_pr_facts(session, repo_id, window), window)
+
+
+def _net_changes(history: CapacityReport) -> list[int]:
+    return [week.arrivals - week.served - week.exited_unreviewed for week in history.weeks]
+
+
+def _fact_out(fact: Fact) -> schemas.FactOut:
+    return schemas.FactOut(id=fact.id, text=fact.text)
 
 
 async def _synced_repo(
