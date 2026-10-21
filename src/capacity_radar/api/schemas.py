@@ -106,3 +106,41 @@ class CapacityResponse(BaseModel):
     reviewers: Reviewers
     weeks: list[Week]
     data_quality: DataQualityOut
+
+
+class HistoryWeek(BaseModel):
+    start: date
+    end: date  # inclusive
+    arrivals: int
+    served: int
+    exited_unreviewed: int
+    net_change: int = Field(description="arrivals - served - exited unreviewed")
+
+
+class ForecastHistory(BaseModel):
+    start: date = Field(serialization_alias="from")
+    end: date = Field(serialization_alias="to")
+    weeks: list[HistoryWeek]
+
+
+class ForecastWeekOut(BaseModel):
+    week: int = Field(description="1 = the first week after the history ends")
+    ends_on: date
+    p10: float = Field(description="good case: 10% of simulated futures end below this")
+    p50: float = Field(description="the middle outcome")
+    p90: float = Field(description="bad case: 10% of simulated futures end above this")
+    chance_queue_grows: float = Field(description="share of futures above today's queue")
+
+
+class Simulation(BaseModel):
+    runs: int = Field(description="simulated futures")
+    seed: int = Field(description="fixed: the same data always gives the same forecast")
+
+
+class QueueForecastResponse(BaseModel):
+    repo: str
+    data_as_of: datetime
+    queue_now: int = Field(description="PRs waiting for a first review at the end of history")
+    history: ForecastHistory
+    simulation: Simulation
+    forecast: list[ForecastWeekOut]

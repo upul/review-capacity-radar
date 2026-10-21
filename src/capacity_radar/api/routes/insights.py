@@ -1,18 +1,27 @@
-"""GET /api/v1/repos/{owner}/{repo}/insights/review-capacity"""
+"""GET /api/v1/repos/{owner}/{repo}/insights/review-capacity
+GET /api/v1/repos/{owner}/{repo}/insights/queue-forecast"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from capacity_radar.analytics import queries
+from capacity_radar.analytics.forecast import MIN_HISTORY_WEEKS, RUNS, SEED, forecast_queue
 from capacity_radar.analytics.metrics import (
     CapacityReport,
     capacity_report,
     reviewer_concentration,
 )
-from capacity_radar.analytics.periods import Window, WindowError, make_window
+from capacity_radar.analytics.periods import (
+    DEFAULT_WEEKS,
+    Window,
+    WindowError,
+    make_window,
+    recent_full_weeks,
+)
 from capacity_radar.api import schemas
 from capacity_radar.api.deps import SessionDep, SettingsDep
 from capacity_radar.api.errors import ProblemError
@@ -40,23 +49,13 @@ async def review_capacity(
     last_day: Annotated[date | None, Query(alias="to")] = None,
 ) -> schemas.CapacityResponse:
     """Review supply and demand for a repository over a date range (UTC, both ends
-    inclusive). Defaults to the 12 weeks ending at the latest synced data."""
-    if {owner, repo} & {".", ".."}:
-        raise ProblemError(400, "'.' and '..' are not repository names")
-
-    repository = await session.scalar(
-        select(Repository).where(Repository.owner == owner.lower(), Repository.name == repo.lower())
-    )
-    state = await session.get(SyncState, repository.id) if repository else None
-    if repository is None or state is None or state.history_start is None:
-        raise ProblemError(404, f"{owner}/{repo} has not been synced yet; run a sync first")
-    data_as_of = state.last_success_at or state.history_start
-
+    inclusive). Defaults to the 12 weeks ending at the last complete day of data."""
+    repository, history_start, data_as_of = await _synced_repo(session, owner, repo)
     try:
         window = make_window(
             first_day,
             last_day,
-            history_start=state.history_start,
+            history_start=history_start,
             data_as_of=data_as_of,
             max_days=settings.max_window_days,
         )
@@ -106,7 +105,7 @@ async def review_capacity(
             for week in report.weeks
         ],
         data_quality=schemas.DataQualityOut(
-            history_start=state.history_start,
+            history_start=history_start,
             prs_created=quality.prs_created,
             bot_pr_share=_share(quality.bot_prs, quality.prs_created),
             drafts_excluded=quality.drafts_excluded,
@@ -114,6 +113,85 @@ async def review_capacity(
             capacity_limited_weeks=sum(week.capacity_limited for week in report.weeks),
         ),
     )
+
+
+@router.get(
+    "/repos/{owner}/{repo}/insights/queue-forecast",
+    response_model=schemas.QueueForecastResponse,
+    responses={400: PROBLEM, 404: PROBLEM, 422: PROBLEM},
+)
+async def queue_forecast(
+    owner: Name,
+    repo: Name,
+    session: SessionDep,
+    settings: SettingsDep,
+    weeks: Annotated[int, Query(ge=1, description="weeks ahead to forecast")] = 4,
+) -> schemas.QueueForecastResponse:
+    """How big the review queue may get in the coming weeks, if they look like the recent
+    past: 2,000 simulated futures, each replaying randomly chosen weeks from the last 12."""
+    if weeks > settings.max_forecast_weeks:
+        raise ProblemError(400, f"'weeks' can be at most {settings.max_forecast_weeks}")
+    repository, history_start, data_as_of = await _synced_repo(session, owner, repo)
+
+    window = recent_full_weeks(
+        history_start=history_start, data_as_of=data_as_of, weeks=DEFAULT_WEEKS
+    )
+    history = capacity_report(await queries.load_pr_facts(session, repository.id, window), window)
+    if len(history.weeks) < MIN_HISTORY_WEEKS:
+        raise ProblemError(
+            400, f"need {MIN_HISTORY_WEEKS} complete weeks of synced data to forecast"
+        )
+    net_changes = [week.arrivals - week.served - week.exited_unreviewed for week in history.weeks]
+    forecast = forecast_queue(history.queue_at_end, net_changes, weeks)
+
+    return schemas.QueueForecastResponse(
+        repo=f"{repository.owner}/{repository.name}",
+        data_as_of=data_as_of,
+        queue_now=history.queue_at_end,
+        history=schemas.ForecastHistory(
+            start=window.start.date(),
+            end=_last_day(window),
+            weeks=[
+                schemas.HistoryWeek(
+                    start=week.start.date(),
+                    end=(week.end - timedelta(days=1)).date(),
+                    arrivals=week.arrivals,
+                    served=week.served,
+                    exited_unreviewed=week.exited_unreviewed,
+                    net_change=net,
+                )
+                for week, net in zip(history.weeks, net_changes, strict=True)
+            ],
+        ),
+        simulation=schemas.Simulation(runs=RUNS, seed=SEED),
+        forecast=[
+            schemas.ForecastWeekOut(
+                week=week.week,
+                ends_on=_last_day(window) + timedelta(weeks=week.week),
+                p10=round(week.p10, 1),
+                p50=round(week.p50, 1),
+                p90=round(week.p90, 1),
+                chance_queue_grows=round(week.chance_queue_grows, 3),
+            )
+            for week in forecast
+        ],
+    )
+
+
+async def _synced_repo(
+    session: AsyncSession, owner: str, repo: str
+) -> tuple[Repository, datetime, datetime]:
+    """The repository, where its synced data starts, and how recent it is; 404 if the
+    repository was never synced."""
+    if {owner, repo} & {".", ".."}:
+        raise ProblemError(400, "'.' and '..' are not repository names")
+    repository = await session.scalar(
+        select(Repository).where(Repository.owner == owner.lower(), Repository.name == repo.lower())
+    )
+    state = await session.get(SyncState, repository.id) if repository else None
+    if repository is None or state is None or state.history_start is None:
+        raise ProblemError(404, f"{owner}/{repo} has not been synced yet; run a sync first")
+    return repository, state.history_start, state.last_success_at or state.history_start
 
 
 def _summary(report: CapacityReport) -> schemas.Summary:

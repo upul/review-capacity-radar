@@ -72,6 +72,14 @@ def make_window(
     return window
 
 
+def recent_full_weeks(*, history_start: datetime, data_as_of: datetime, weeks: int) -> Window:
+    """The latest `weeks` complete weeks of data, ending at the last complete day. Fewer
+    weeks if the synced history is shorter; every bucket of the result is a full week."""
+    end = _midnight(data_as_of.date())  # exclusive: the day of data_as_of is incomplete
+    available = (end - _midnight(_first_full_day(history_start))) // timedelta(weeks=1)
+    return Window(end - timedelta(weeks=max(min(weeks, available), 0)), end)
+
+
 def _first_full_day(history_start: datetime) -> date:
     """The first day the synced data covers completely."""
     starts_at_midnight = history_start.time() == time.min
