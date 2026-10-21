@@ -16,5 +16,17 @@ services:
       timeout: 3s
       retries: 15
 
+  app:
+    build: .
+    env_file: .env  # GITHUB_TOKEN, LLM_API_KEY, LLM_MODEL, ...
+    environment:
+      # Inside Compose the database is the "db" service, not localhost.
+      DATABASE_URL: postgresql+asyncpg://radar:radar@db:5432/radar
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

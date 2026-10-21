@@ -52,7 +52,7 @@ async def sync_repo(
         cursor = state.cursor_updated_at if state else None
 
     first_run = cursor is None
-    stop_at = cursor or datetime.now(UTC) - timedelta(weeks=lookback_weeks)
+    stop_at = cursor or (datetime.now(UTC) - timedelta(weeks=lookback_weeks))
 
     # PRs come newest-updated first, so everything after the first one older than stop_at
     # is older too. A PR updated while we page moves to the top and is skipped this run,
